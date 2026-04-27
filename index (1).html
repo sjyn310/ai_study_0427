@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Figma → Claude 워크플로우 발표</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;700;900&family=Space+Mono:wght@400;700&display=swap');
+
+  :root {
+    --navy: #1a3c6e;
+    --navy-light: #2e5494;
+    --blue: #2e74b8;
+    --sky: #7ec8f7;
+    --white: #ffffff;
+    --gray: #f0f4f9;
+    --dark: #0d1f3c;
+    --accent: #f0a500;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Noto Sans KR', sans-serif;
+    background: #0a0a0a;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  /* ── 슬라이드 컨테이너 ── */
+  .deck {
+    width: 100vw;
+    height: 100vh;
+    position: relative;
+  }
+
+  .slide {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.5s ease;
+    padding: 60px;
+  }
+  .slide.active {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  /* ── 네비게이션 ── */
+  .nav {
+    position: fixed;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+    z-index: 100;
+  }
+  .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.3);
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+  .dot.active { background: var(--sky); width: 24px; border-radius: 4px; }
+
+  .arrow {
+    position: fixed;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: white;
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 18px;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 100;
+    transition: all 0.2s;
+  }
+  .arrow:hover { background: rgba(255,255,255,0.18); }
+  .arrow.left { left: 20px; }
+  .arrow.right { right: 20px; }
+
+  .slide-num {
+    position: fixed;
+    top: 24px; right: 32px;
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    color: rgba(255,255,255,0.35);
+    z-index: 100;
+  }
+
+  /* ════════════════════════════
+     슬라이드 1 — 표지
+  ════════════════════════════ */
+  .s1 {
+    background: var(--dark);
+    overflow: hidden;
+  }
+  .s1::before {
+    content: '';
+    position: absolute;
+    width: 600px; height: 600px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(46,116,184,0.25) 0%, transparent 70%);
+    top: -150px; right: -100px;
+  }
+  .s1::after {
+    content: '';
+    position: absolute;
+    width: 400px; height: 400px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(126,200,247,0.12) 0%, transparent 70%);
+    bottom: -100px; left: 50px;
+  }
+  .s1-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--sky);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 24px;
+    opacity: 0.8;
+  }
+  .s1-title {
+    font-size: clamp(36px, 5vw, 64px);
+    font-weight: 900;
+    color: var(--white);
+    line-height: 1.15;
+    text-align: center;
+    margin-bottom: 16px;
+    word-break: keep-all;
+  }
+  .s1-title span {
+    color: var(--sky);
+  }
+  .s1-sub {
+    font-size: 16px;
+    color: rgba(255,255,255,0.5);
+    text-align: center;
+    margin-bottom: 48px;
+    line-height: 1.7;
+    word-break: keep-all;
+  }
+  .s1-flow {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 50px;
+    padding: 14px 32px;
+  }
+  .s1-flow-item {
+    font-size: 14px;
+    font-weight: 700;
+    color: white;
+  }
+  .s1-flow-item.dim { color: rgba(255,255,255,0.4); font-weight: 400; font-size: 12px; }
+  .s1-flow-arrow { color: var(--sky); font-size: 18px; }
+
+  /* ════════════════════════════
+     슬라이드 2 — 배경/문제
+  ════════════════════════════ */
+  .s2 { background: #0f1e35; }
+  .s2-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+    width: 100%;
+    max-width: 900px;
+  }
+  .s2-left { display: flex; flex-direction: column; justify-content: center; }
+  .section-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--sky);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+  .slide-title {
+    font-size: clamp(24px, 3vw, 40px);
+    font-weight: 900;
+    color: white;
+    line-height: 1.25;
+    margin-bottom: 20px;
+    word-break: keep-all;
+  }
+  .slide-title span { color: var(--sky); }
+  .body-text {
+    font-size: 15px;
+    color: rgba(255,255,255,0.6);
+    line-height: 1.8;
+    word-break: keep-all;
+  }
+  .pain-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .pain-card {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 16px 20px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .pain-icon {
+    font-size: 20px;
+    margin-top: 1px;
+  }
+  .pain-text {
+    font-size: 13.5px;
+    color: rgba(255,255,255,0.7);
+    line-height: 1.6;
+    word-break: keep-all;
+  }
+  .pain-text strong { color: white; }
+
+  /* ════════════════════════════
+     슬라이드 3 — 워크플로우
+  ════════════════════════════ */
+  .s3 { background: var(--dark); }
+  .s3-content { width: 100%; max-width: 860px; }
+  .workflow-steps {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0;
+    margin-top: 40px;
+    position: relative;
+  }
+  .workflow-steps::before {
+    content: '';
+    position: absolute;
+    top: 36px;
+    left: 10%;
+    width: 80%;
+    height: 2px;
+    background: linear-gradient(to right, var(--blue), var(--sky));
+    z-index: 0;
+  }
+  .wf-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    position: relative;
+    z-index: 1;
+    padding: 0 8px;
+  }
+  .wf-num {
+    width: 72px; height: 72px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px;
+    margin-bottom: 16px;
+    position: relative;
+  }
+  .wf-step:nth-child(1) .wf-num { background: #1e3a5f; border: 2px solid #2e74b8; }
+  .wf-step:nth-child(2) .wf-num { background: #1a4a7a; border: 2px solid #3d8fc4; }
+  .wf-step:nth-child(3) .wf-num { background: #165a8a; border: 2px solid #5aaddb; }
+  .wf-step:nth-child(4) .wf-num { background: #0e6090; border: 2px solid var(--sky); }
+  .wf-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: white;
+    margin-bottom: 8px;
+  }
+  .wf-desc {
+    font-size: 11.5px;
+    color: rgba(255,255,255,0.5);
+    line-height: 1.6;
+    word-break: keep-all;
+  }
+
+  /* ════════════════════════════
+     슬라이드 4 — 실제 작업 과정
+  ════════════════════════════ */
+  .s4 { background: #0b1828; }
+  .s4-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+    width: 100%;
+    max-width: 900px;
+  }
+  .task-list { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+  .task-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.04);
+    border-left: 3px solid transparent;
+    font-size: 13px;
+    color: rgba(255,255,255,0.7);
+    word-break: keep-all;
+    line-height: 1.5;
+    transition: all 0.2s;
+  }
+  .task-item.done {
+    border-left-color: var(--sky);
+    color: rgba(255,255,255,0.85);
+  }
+  .task-item .check { font-size: 14px; }
+  .chat-bubble-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 12px;
+  }
+  .chat-bubble {
+    padding: 12px 16px;
+    border-radius: 12px;
+    font-size: 12.5px;
+    line-height: 1.6;
+    max-width: 90%;
+    word-break: keep-all;
+  }
+  .chat-bubble.user {
+    background: rgba(46,116,184,0.25);
+    border: 1px solid rgba(46,116,184,0.3);
+    color: #c8e4f8;
+    align-self: flex-end;
+    border-bottom-right-radius: 4px;
+  }
+  .chat-bubble.ai {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: rgba(255,255,255,0.75);
+    align-self: flex-start;
+    border-bottom-left-radius: 4px;
+  }
+  .chat-label {
+    font-size: 10px;
+    color: rgba(255,255,255,0.35);
+    margin-bottom: 4px;
+    font-family: 'Space Mono', monospace;
+  }
+  .chat-label.right { text-align: right; }
+
+  /* ════════════════════════════
+     슬라이드 5 — 결과/비교
+  ════════════════════════════ */
+  .s5 { background: #0a1520; }
+  .s5-content { width: 100%; max-width: 900px; }
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-top: 36px;
+  }
+  .compare-card {
+    border-radius: 16px;
+    padding: 28px;
+    position: relative;
+    overflow: hidden;
+  }
+  .compare-card.before {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .compare-card.after {
+    background: linear-gradient(135deg, rgba(26,60,110,0.6), rgba(46,116,184,0.3));
+    border: 1px solid rgba(126,200,247,0.25);
+  }
+  .compare-badge {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 20px;
+  }
+  .compare-card.before .compare-badge { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.5); }
+  .compare-card.after .compare-badge { background: rgba(126,200,247,0.2); color: var(--sky); }
+  .compare-title {
+    font-size: 18px;
+    font-weight: 900;
+    color: white;
+    margin-bottom: 16px;
+    word-break: keep-all;
+  }
+  .compare-items { display: flex; flex-direction: column; gap: 8px; }
+  .compare-item {
+    font-size: 13px;
+    color: rgba(255,255,255,0.6);
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    line-height: 1.5;
+    word-break: keep-all;
+  }
+  .compare-item .icon { font-size: 14px; margin-top: 1px; }
+  .compare-card.after .compare-item { color: rgba(255,255,255,0.8); }
+
+  /* ════════════════════════════
+     슬라이드 6 — 핵심 인사이트
+  ════════════════════════════ */
+  .s6 { background: #0d1f3c; }
+  .insight-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    margin-top: 40px;
+    width: 100%;
+    max-width: 900px;
+  }
+  .insight-card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    padding: 28px 24px;
+    text-align: center;
+    transition: transform 0.3s;
+  }
+  .insight-card:hover { transform: translateY(-4px); }
+  .insight-icon { font-size: 32px; margin-bottom: 14px; }
+  .insight-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: white;
+    margin-bottom: 10px;
+    word-break: keep-all;
+  }
+  .insight-desc {
+    font-size: 12.5px;
+    color: rgba(255,255,255,0.5);
+    line-height: 1.7;
+    word-break: keep-all;
+  }
+
+  /* ════════════════════════════
+     슬라이드 7 — 마무리
+  ════════════════════════════ */
+  .s7 {
+    background: var(--dark);
+    overflow: hidden;
+  }
+  .s7::before {
+    content: '';
+    position: absolute;
+    width: 700px; height: 700px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(26,60,110,0.4) 0%, transparent 65%);
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+  }
+  .s7-content {
+    text-align: center;
+    position: relative;
+    z-index: 1;
+  }
+  .s7-quote {
+    font-size: clamp(20px, 2.5vw, 32px);
+    font-weight: 900;
+    color: white;
+    line-height: 1.5;
+    margin-bottom: 32px;
+    word-break: keep-all;
+    max-width: 700px;
+  }
+  .s7-quote span { color: var(--sky); }
+  .s7-sub {
+    font-size: 15px;
+    color: rgba(255,255,255,0.45);
+    line-height: 1.8;
+    margin-bottom: 48px;
+    word-break: keep-all;
+  }
+  .s7-tags {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .tag {
+    padding: 8px 18px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    border: 1px solid rgba(126,200,247,0.3);
+    color: var(--sky);
+    background: rgba(126,200,247,0.08);
+  }
+
+  /* ════════════════════════════
+     슬라이드 5-b — 실제 결과물 비교
+  ════════════════════════════ */
+  .s-compare { background: #080e1a; }
+  .compare-imgs {
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+    width: 100%;
+    max-width: 1000px;
+    height: 65vh;
+  }
+  .cimg-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+  .cimg-label {
+    font-size: 13px;
+    font-weight: 700;
+    padding: 8px 16px;
+    border-radius: 20px;
+    margin-bottom: 12px;
+    text-align: center;
+    align-self: center;
+  }
+  .before-label {
+    background: rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.6);
+    border: 1px solid rgba(255,255,255,0.12);
+  }
+  .after-label {
+    background: rgba(126,200,247,0.15);
+    color: var(--sky);
+    border: 1px solid rgba(126,200,247,0.3);
+  }
+  .cimg-frame {
+    flex: 1;
+    border-radius: 12px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: #fff;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(126,200,247,0.4) transparent;
+  }
+  .cimg-frame img {
+    width: 100%;
+    display: block;
+  }
+  .cimg-divider {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.25);
+    align-self: center;
+    padding-top: 40px;
+  }
+</style>
+</head>
+<body>
+
+<div class="deck">
+
+  <!-- 슬라이드 번호 -->
+  <div class="slide-num" id="slideNum">1 / 7</div>
+
+  <!-- 네비 화살표 -->
+  <div class="arrow left" onclick="changeSlide(-1)">←</div>
+  <div class="arrow right" onclick="changeSlide(1)">→</div>
+
+  <!-- 하단 dot -->
+  <div class="nav" id="nav"></div>
+
+  <!-- ══ 슬라이드 1: 표지 ══ -->
+  <div class="slide s1 active">
+    <div class="s1-badge">AI Study Presentation</div>
+    <div class="s1-title">
+      피그마로 시작해서<br><span>Claude로 완성했다</span>
+    </div>
+    <div class="s1-sub">
+      코딩 없이 매주 지면 콘텐츠를 제작하는<br>새로운 콘텐츠 제작 워크플로우
+    </div>
+    <div class="s1-flow">
+      <span class="s1-flow-item">🎨 Figma 시안</span>
+      <span class="s1-flow-arrow">→</span>
+      <span class="s1-flow-item">📝 인터뷰 원고</span>
+      <span class="s1-flow-arrow">→</span>
+      <span class="s1-flow-item dim">💬 Claude</span>
+      <span class="s1-flow-arrow">→</span>
+      <span class="s1-flow-item">✅ 완성 결과물</span>
+    </div>
+  </div>
+
+  <!-- ══ 슬라이드 2: 배경 ══ -->
+  <div class="slide s2">
+    <div class="s2-grid">
+      <div class="s2-left">
+        <div class="section-label">Background</div>
+        <div class="slide-title">매주 반복되는<br>지면 콘텐츠 제작,<br><span>이렇게 힘들었다</span></div>
+        <div class="body-text">
+          경리나라 고객 인터뷰를 매주 제작.<br>
+          사진 + 원고를 받으면 피그마로 직접 디자인해야 했다.
+        </div>
+      </div>
+      <div class="pain-cards">
+        <div class="pain-card">
+          <div class="pain-icon">⏱️</div>
+          <div class="pain-text"><strong>시간 소모</strong><br>매주 피그마에서 레이아웃, 텍스트, 이미지를 수동으로 작업</div>
+        </div>
+        <div class="pain-card">
+          <div class="pain-icon">🔁</div>
+          <div class="pain-text"><strong>반복 작업</strong><br>포맷은 동일한데 매번 처음부터 다시 만드는 비효율</div>
+        </div>
+        <div class="pain-card">
+          <div class="pain-icon">📐</div>
+          <div class="pain-text"><strong>형식 유지의 어려움</strong><br>일관된 디자인 시스템을 혼자 유지하는 것의 한계</div>
+        </div>
+        <div class="pain-card">
+          <div class="pain-icon">💡</div>
+          <div class="pain-text"><strong>아이디어</strong><br>기존 결과물을 Claude에게 보여주면 똑같이 만들어줄 수 있지 않을까?</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ 슬라이드 3: 워크플로우 ══ -->
+  <div class="slide s3">
+    <div class="s3-content">
+      <div class="section-label" style="text-align:center;">Workflow</div>
+      <div class="slide-title" style="text-align:center;">Claude와 함께한<br><span>4단계 제작 과정</span></div>
+      <div class="workflow-steps">
+        <div class="wf-step">
+          <div class="wf-num">🎨</div>
+          <div class="wf-title">레퍼런스 제공</div>
+          <div class="wf-desc">기존 피그마 지면 캡처 + 인터뷰 원고 + 사진을 Claude에게 전달</div>
+        </div>
+        <div class="wf-step">
+          <div class="wf-num">⚡</div>
+          <div class="wf-title">초안 생성</div>
+          <div class="wf-desc">Claude가 기존 형식을 분석해 HTML 지면 콘텐츠 자동 생성</div>
+        </div>
+        <div class="wf-step">
+          <div class="wf-num">🔧</div>
+          <div class="wf-title">반복 수정</div>
+          <div class="wf-desc">사진 교체, 문구 수정, 레이아웃 조정을 대화로 해결</div>
+        </div>
+        <div class="wf-step">
+          <div class="wf-num">✅</div>
+          <div class="wf-title">이미지 출력</div>
+          <div class="wf-desc">완성된 HTML을 고해상도 PNG 또는 PDF로 변환 완료</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ 슬라이드 4: 실제 대화 ══ -->
+  <div class="slide s4">
+    <div class="s4-grid">
+      <div>
+        <div class="section-label">What We Did</div>
+        <div class="slide-title">실제로<br><span>이런 작업을 했다</span></div>
+        <div class="task-list">
+          <div class="task-item done"><span class="check">✦</span>인터뷰 원고 → 섹션별 본문 자동 작성</div>
+          <div class="task-item done"><span class="check">✦</span>사진 6장 배치 및 교체</div>
+          <div class="task-item done"><span class="check">✦</span>헤드라인 카피 4개 안 제시 → 선택</div>
+          <div class="task-item done"><span class="check">✦</span>이미지 크롭 위치, 여백, 색상 수정</div>
+          <div class="task-item done"><span class="check">✦</span>HTML → PNG 1095px 고해상도 출력</div>
+          <div class="task-item done"><span class="check">✦</span>폰트 내장 → 브라우저 렌더 품질 유지</div>
+        </div>
+      </div>
+      <div>
+        <div class="section-label">Real Conversation</div>
+        <div class="slide-title" style="font-size:20px; margin-bottom:12px;">실제 대화 예시</div>
+        <div class="chat-bubble-wrap">
+          <div>
+            <div class="chat-label right">나</div>
+            <div class="chat-bubble user">사진 + 인터뷰 원고를 받으면, 내가 매주 지면 콘텐츠를 만들거든. 너가 대신 만들어줄 수 있어?</div>
+          </div>
+          <div>
+            <div class="chat-label">Claude</div>
+            <div class="chat-bubble ai">네, 물론이죠! 사진 + 인터뷰 원고 + 기존 지면 콘텐츠 예시를 함께 올려주시면, 그 형식과 톤에 맞춰서 바로 작성해드릴게요.</div>
+          </div>
+          <div>
+            <div class="chat-label right">나</div>
+            <div class="chat-bubble user">엄지 든 사진 천장이 너무 많이 나오고 인물이 너무 짤렸어.</div>
+          </div>
+          <div>
+            <div class="chat-label">Claude</div>
+            <div class="chat-bubble ai">object-position을 55%로 내려서 위 공백을 줄이고 엄지가 더 잘 보이도록 했어요. ✅</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ 슬라이드 5: Before / After ══ -->
+  <div class="slide s5">
+    <div class="s5-content">
+      <div class="section-label" style="text-align:center;">Before / After</div>
+      <div class="slide-title" style="text-align:center;">워크플로우가<br><span>이렇게 달라졌다</span></div>
+      <div class="compare-grid">
+        <div class="compare-card before">
+          <div class="compare-badge">Before</div>
+          <div class="compare-title">피그마 수동 작업</div>
+          <div class="compare-items">
+            <div class="compare-item"><span class="icon">😓</span>원고 읽고 → 직접 타이핑 → 레이아웃 조정</div>
+            <div class="compare-item"><span class="icon">🖼️</span>사진 직접 배치 및 크롭 조정</div>
+            <div class="compare-item"><span class="icon">✏️</span>헤드라인 혼자 고민</div>
+            <div class="compare-item"><span class="icon">📤</span>JPG 내보내기로 마무리</div>
+            <div class="compare-item"><span class="icon">⏰</span>소요 시간: 수 시간</div>
+          </div>
+        </div>
+        <div class="compare-card after">
+          <div class="compare-badge">After — Claude</div>
+          <div class="compare-title">대화로 완성하는 지면</div>
+          <div class="compare-items">
+            <div class="compare-item"><span class="icon">📎</span>원고 + 사진 첨부만 하면 초안 완성</div>
+            <div class="compare-item"><span class="icon">💬</span>"이 사진 넣어줘" 한 마디로 교체</div>
+            <div class="compare-item"><span class="icon">🎯</span>헤드라인 4개 안 받고 선택</div>
+            <div class="compare-item"><span class="icon">🖼️</span>1095px PNG / PDF 자동 변환</div>
+            <div class="compare-item"><span class="icon">⚡</span>소요 시간: 대폭 단축</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ══ 슬라이드 6: 실제 결과물 비교 ══ -->
+  <div class="slide s-compare">
+    <div class="section-label" style="text-align:center; margin-bottom:12px;">Result Comparison</div>
+    <div class="slide-title" style="text-align:center; margin-bottom:28px;">직접 보세요 — <span>피그마 vs Claude</span></div>
+    <div class="compare-imgs">
+      <div class="cimg-wrap">
+        <div class="cimg-label before-label">🎨 Figma로 만든 지면</div>
+        <div class="cimg-frame">
+          <img src="figma_result.jpeg" alt="피그마 결과물">
+        </div>
+      </div>
+      <div class="cimg-divider">VS</div>
+      <div class="cimg-wrap">
+        <div class="cimg-label after-label">✨ Claude로 만든 지면</div>
+        <div class="cimg-frame">
+          <img src="claude_result.jpeg" alt="Claude 결과물">
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- ══ 슬라이드 6: 인사이트 ══ -->
+  <div class="slide s6">
+    <div class="section-label" style="text-align:center;">Key Insights</div>
+    <div class="slide-title" style="text-align:center;">써보면서 느낀 것들</div>
+    <div class="insight-grid">
+      <div class="insight-card">
+        <div class="insight-icon">📋</div>
+        <div class="insight-title">레퍼런스가 핵심이다</div>
+        <div class="insight-desc">기존 결과물을 보여주면 Claude가 디자인 시스템을 스스로 파악한다. 잘 만든 예시 하나가 프롬프트 100줄보다 낫다.</div>
+      </div>
+      <div class="insight-card">
+        <div class="insight-icon">🔄</div>
+        <div class="insight-title">반복 수정이 자연스럽다</div>
+        <div class="insight-desc">한 번에 완벽할 필요 없다. "이 부분 바꿔줘"가 쌓이면서 결과물이 완성된다. 피그마보다 빠른 iteration.</div>
+      </div>
+      <div class="insight-card">
+        <div class="insight-icon">🛠️</div>
+        <div class="insight-title">도구의 한계를 알아야 한다</div>
+        <div class="insight-desc">폰트 로딩, PDF 렌더링 등 환경 제약이 있다. 한계를 알고 우회 방법을 찾는 것도 AI 활용 역량이다.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ 슬라이드 7: 마무리 ══ -->
+  <div class="slide s7">
+    <div class="s7-content">
+      <div class="s7-quote">
+        "코딩을 몰라도,<br><span>대화만으로 결과물을 만들 수 있다"</span>
+      </div>
+      <div class="s7-sub">
+        피그마로 만들던 지면을 Claude와의 대화로 완성했다.<br>
+        앞으로의 콘텐츠 제작은 도구가 아니라 대화로 시작된다.
+      </div>
+      <div class="s7-tags">
+        <span class="tag">#Claude</span>
+        <span class="tag">#NoCode</span>
+        <span class="tag">#콘텐츠자동화</span>
+        <span class="tag">#Figma→Claude</span>
+        <span class="tag">#AI워크플로우</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  let current = 0;
+  const slides = document.querySelectorAll('.slide');
+  const total = slides.length;
+  const nav = document.getElementById('nav');
+  const slideNum = document.getElementById('slideNum');
+
+  // dot 생성
+  slides.forEach((_, i) => {
+    const dot = document.createElement('div');
+    dot.className = 'dot' + (i === 0 ? ' active' : '');
+    dot.onclick = () => goTo(i);
+    nav.appendChild(dot);
+  });
+
+  function goTo(n) {
+    slides[current].classList.remove('active');
+    nav.children[current].classList.remove('active');
+    current = (n + total) % total;
+    slides[current].classList.add('active');
+    nav.children[current].classList.add('active');
+    slideNum.textContent = `${current + 1} / ${total}`;
+  }
+
+  function changeSlide(dir) { goTo(current + dir); }
+
+  // 키보드
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') changeSlide(1);
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') changeSlide(-1);
+  });
+
+  // 터치 스와이프
+  let startX = 0;
+  document.addEventListener('touchstart', e => startX = e.touches[0].clientX);
+  document.addEventListener('touchend', e => {
+    const diff = startX - e.changedTouches[0].clientX;
+    if (Math.abs(diff) > 50) changeSlide(diff > 0 ? 1 : -1);
+  });
+</script>
+</body>
+</html>
